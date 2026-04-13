@@ -1,0 +1,52 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - wf
+
+jobs:
+  build:
+    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          EXT=""
+          if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
+          go build -ldflags "-X main.version=${{ github.sha }} -X main.date=$(date --iso-8601=seconds)" \
+            -o dist/mcp-alertmanager-${{ matrix.goos }}-${{ matrix.goarch }}${EXT} \
+            ./cmd/mcp-alertmanager
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-alertmanager-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/
+          retention-days: 700
