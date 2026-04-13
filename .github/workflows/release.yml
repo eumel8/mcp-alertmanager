@@ -7,28 +7,45 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
-  goreleaser:
-    name: GoReleaser
+  build:
+    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
 
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          distribution: goreleaser
-          version: latest
-          args: release --clean
+      - name: Build
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          EXT=""
+          [ "$GOOS" = "windows" ] && EXT=".exe"
+          go build -o mcp-alertmanager-${{ matrix.goos }}-${{ matrix.goarch }}${EXT} ./cmd/mcp-alertmanager
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: mcp-alertmanager-${{ matrix.goos }}-${{ matrix.goarch }}*
